@@ -1,0 +1,212 @@
+//KC03BDCA JOB ,'J MCLAIN',MSGCLASS=H
+//*
+//*****************************************************************
+//*                                                               *
+//*  CSCI 465               ASSIGNMENT 4               FALL 2021  *
+//*                                                               *
+//*  DEVELOPER NAME: JUSTIN MCLAIN                                *
+//*  DATE DUE: 10/01/2021                                         *
+//*                                                               *
+//*  PURPOSE: program that creates a single report based          *
+//*  on information contained in an input file with an            *
+//*  unknown number of records.                                   *
+//*                                                               *
+//*****************************************************************
+//*
+//*******************************************
+//*COMPILE STEP                             *
+//*******************************************
+//JSTEP01  EXEC PGM=IGYCRCTL,REGION=0M,PARM=APOST
+//*
+//STEPLIB  DD DSN=IGY630.SIGYCOMP,DISP=SHR
+//*
+//SYSIN    DD *
+      ****************************************************************
+      *                                                              *
+      * PROGRAM NAME:  SALESRPT                                      *
+      *                                                              *
+      * FUNCTION:  THIS PROGRAM READS INPUT DATA RECORDS AND THEN    *
+      *            WRITES THEM TO STANDARD OUTPUT.                   *
+      *                                                              *
+      * INPUT:     INFILE - THE INPUT DATA RECORDS READ IN.          *
+      *                                                              *
+      * OUTPUT:    OUTFILE - THE INPUT DATA RECORDS WRITTEN OUT.     *
+      *                                                              *
+      ****************************************************************
+
+       IDENTIFICATION DIVISION.
+
+       PROGRAM-ID.    ACCOUNTS.
+       AUTHOR.        GEOFFREY D DECKER.
+       DATE-WRITTEN.  02/12/2021.
+       DATE-COMPILED.
+
+       ENVIRONMENT DIVISION.
+
+       INPUT-OUTPUT SECTION.
+
+       FILE-CONTROL.
+
+           SELECT SALES-FILE ASSIGN TO SALESFLE.
+           SELECT REPORT-FILE ASSIGN TO RPTFILE.
+
+       DATA DIVISION.
+
+       FILE SECTION.
+
+       FD  SALES-FILE
+           RECORDING MODE F.
+
+       01  SALES-RECORD.
+           05  IN-BRANCH-NME           PIC X(25).
+           05  IN-BROKER-NME           PIC X(25).
+           05  IN-DEP-AMT              PIC S9(9)V99.
+           05  FILLER                  PIC X(3)  VALUE SPACES.
+           05  IN-COMM-FLG             PIC S9(1).
+           05  FILLER                  PIC X(15) VALUE SPACES.
+
+       FD  REPORT-FILE
+           RECORDING MODE F
+           BLOCK CONTAINS 20 RECORDS.
+
+       01  REPORT-RECORD               PIC X(132).
+
+       WORKING-STORAGE SECTION.
+
+       01  VARIABLES.
+           05  EOFFLAG                 PIC X VALUE 'N'.
+           05  TOT-DEP-AMT             PIC S9(10)V99 PACKED-DECIMAL
+                                                     VALUE 0.
+       01  DETAIL-1.
+           05  DETAIL-LINE.
+               10  OUT-BRANCH-NME           PIC X(25).
+               10  FILLER                   PIC X(10) VALUE SPACES.
+               10  OUT-BROKER-NME           PIC X(25).
+               10  FILLER                   PIC X(10) VALUE SPACES.
+               10  OUT-DEP-AMT              PIC $$$,$$$,$$9.99.
+               10  FILLER                   PIC X(3) VALUE SPACES.
+               10  OUT-COMM-AMT             PIC ZZZZZZZ9.
+               10  FILLER                   PIC X(15) VALUE SPACES.
+               10  FILLER                   PIC X(27) VALUE SPACES.
+
+        01  TOTAL-LINE.
+            05  FILLER                       PIC X(69) VALUE SPACES.
+            05  OUT-TOT-DEP-AMT              PIC $$$$,$$$,$$9.99.
+            05  FILLER                       PIC X(74) VALUE SPACES.
+
+       PROCEDURE DIVISION.
+
+       0000-MAIN.
+
+           OPEN INPUT  SALES-FILE
+                OUTPUT REPORT-FILE.
+
+           READ SALES-FILE
+             AT END MOVE 'Y' TO EOFFLAG
+           END-READ.
+
+           IF EOFFLAG = 'N'
+
+             READ SALES-FILE
+               AT END MOVE 'Y' TO EOFFLAG
+             END-READ
+
+             PERFORM 0100-PROCESS-RECORD
+               UNTIL EOFFLAG = 'Y'
+
+             PERFORM 0200-PROCESS-TOTALS
+
+           END-IF.
+
+           CLOSE SALES-FILE
+                 REPORT-FILE.
+
+           GOBACK.
+
+       0000-EXIT. EXIT.
+
+       0100-PROCESS-RECORD.
+
+           MOVE IN-BRANCH-NME TO OUT-BRANCH-NME.
+           MOVE IN-BROKER-NME TO OUT-BROKER-NME.
+           MOVE IN-DEP-AMT TO OUT-DEP-AMT.
+           MOVE IN-COMM-FLG TO OUT-COMM-AMT.
+
+           COMPUTE TOT-DEP-AMT ROUNDED =
+                   TOT-DEP-AMT + IN-DEP-AMT.
+
+           WRITE REPORT-RECORD FROM DETAIL-LINE AFTER 2.
+
+           READ SALES-FILE
+             AT END MOVE 'Y' TO EOFFLAG
+           END-READ.
+
+       0100-EXIT. EXIT.
+
+       0200-PROCESS-TOTALS.
+
+           MOVE TOT-DEP-AMT TO OUT-TOT-DEP-AMT.
+
+           WRITE REPORT-RECORD FROM TOTAL-LINE AFTER 2.
+
+       0200-EXIT. EXIT.
+/*
+//*
+//SYSLIN   DD DSN=&&OBJMOD,
+//         SPACE=(CYL,(1,1)), //* specifices storage
+//         DISP=(MOD,PASS)
+//*
+//SYSUT1   DD SPACE=(CYL,(1,1))
+//SYSUT2   DD SPACE=(CYL,(1,1))
+//SYSUT3   DD SPACE=(CYL,(1,1))
+//SYSUT4   DD SPACE=(CYL,(1,1))
+//SYSUT5   DD SPACE=(CYL,(1,1))
+//SYSUT6   DD SPACE=(CYL,(1,1))
+//SYSUT7   DD SPACE=(CYL,(1,1))
+//SYSUT8   DD SPACE=(CYL,(1,1))
+//SYSUT9   DD SPACE=(CYL,(1,1))
+//SYSUT10  DD SPACE=(CYL,(1,1))
+//SYSUT11  DD SPACE=(CYL,(1,1))
+//SYSUT12  DD SPACE=(CYL,(1,1))
+//SYSUT13  DD SPACE=(CYL,(1,1))
+//SYSUT14  DD SPACE=(CYL,(1,1))
+//SYSUT15  DD SPACE=(CYL,(1,1))
+//SYSMDECK DD SPACE=(CYL,(1,1))
+//*
+//*
+//SYSPRINT DD SYSOUT=*
+//*
+//SYSUDUMP DD SYSOUT=*
+//*
+//*******************************************
+//*BIND STEP                                *
+//*******************************************
+//JSTEP02  EXEC PGM=HEWL,COND=(0,LT)
+//*
+//SYSLIB   DD DSN=CEE.SCEELKED,DISP=SHR
+//*
+//SYSLIN   DD DSN=&&OBJMOD,DISP=(OLD,DELETE)
+//*
+//SYSLMOD  DD DSN=KC03BDC.CSCI465.LOADLIB(SALESRPT),
+//            SPACE=(1024,(50,20,1)),
+//            DSNTYPE=LIBRARY,
+//            DISP=(MOD,KEEP,KEEP)
+//*
+//SYSPRINT DD SYSOUT=*
+//*
+//SYSUT1   DD SPACE=(CYL,(1,1))
+//*
+//SYSUDUMP DD SYSOUT=*
+//******************************************
+//*FETCH AND EXECUTE                       *
+//******************************************
+//JSTEP03  EXEC PGM=SALESRPT,COND=(0,LT)
+//*
+//STEPLIB  DD DSN=KC03BDC.CSCI465.LOADLIB,DISP=SHR
+//*
+//SALESFLE DD DSN=KC02322.CSCI465.DATAFA21(DATA4),
+//            DISP=SHR
+//*
+//RPTFILE  DD SYSOUT=*
+//*
+//SYSUDUMP DD SYSOUT=*

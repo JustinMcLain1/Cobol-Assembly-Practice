@@ -1,0 +1,924 @@
+//KC03BDCA JOB ,'J MCLAIN',MSGCLASS=H
+//*
+//***************************************************************
+//*                                                             *
+//*  CSCI 465             ASSIGNMENT 7               FALL 2021  *
+//*                                                             *
+//*  PROGRAMMER:  JUSTIN MCLAIN                                 *
+//*        DATE:  11/29/2021                                    *
+//*                                                             *
+//***************************************************************
+//*
+//JSTEP01   EXEC PGM=SORT,PARM='CMP=CP'
+//*
+//SORTIN   DD DSN=KC02322.CSCI465.DATAFA21(FUNDS),DISP=SHR
+//SORTOUT  DD DSN=&&SORTED,SPACE=(TRK,(1,1)),DISP=(NEW,PASS)
+//*
+//SYSOUT   DD SYSOUT=*
+//*
+//SYSIN    DD *
+  SORT FIELDS=(1,3,ZD,A)
+/*
+//*
+//JSTEP02  EXEC PGM=IGYCRCTL,PARM=APOST,REGION=0M
+//*
+//STEPLIB  DD DSN=IGY630.SIGYCOMP,DISP=SHR
+//*
+//SYSLIB   DD DSN=KC02322.CSCI465.COPYLIB,DISP=SHR
+//*
+//SYSIN    DD *
+      ****************************************************************
+      *                                                              *
+      *                   SALERPT                                    *
+      *                                                              *
+      *                                                              *
+      ****************************************************************
+
+       IDENTIFICATION DIVISION.
+
+       PROGRAM-ID.    SALERPT.
+       AUTHOR.        JUSTIN MCLAIN
+       DATE-WRITTEN.  11/29/2021.
+       DATE-COMPILED.
+
+       ENVIRONMENT DIVISION.
+
+       INPUT-OUTPUT SECTION.
+
+       FILE-CONTROL.
+
+           SELECT SALE-FILE ASSIGN TO SALEFILE.
+           SELECT HIGH-SALE-FILE ASSIGN TO HSFILE.
+           SELECT REPORT-FILE ASSIGN TO RPTFILE.
+
+       DATA DIVISION.
+
+       FILE SECTION.
+
+       FD  SALE-FILE
+           RECORDING MODE F.
+
+       COPY SALEREC.
+
+       FD  HIGH-SALE-FILE
+           RECORDING MODE F
+           BLOCK CONTAINS 20 RECORDS.
+
+       COPY HSREC.
+
+
+       FD  REPORT-FILE
+           RECORDING MODE F
+           BLOCK CONTAINS 20 RECORDS.
+
+       01  REPORT-RECORD            PIC X(132).
+
+       WORKING-STORAGE SECTION.
+
+       01  FUND-NBR                 PIC 999.
+
+       01  VARIABLES.
+           05  LINE-CTR             PIC S9(2) BINARY SYNC
+                                                 VALUE 99.
+           05  SALE-CTR             PIC S9(3) PACKED-DECIMAL
+                                                 VALUE 0.
+           05  PAGE-CTR             PIC S9(3) PACKED-DECIMAL
+                                                 VALUE 0.
+           05  HS-SALE-CTR          PIC S9(2) PACKED-DECIMAL
+                                                 VALUE 0.
+           05  TOT-DEP-AMT          PIC S9(11)V99 PACKED-DECIMAL
+                                                 VALUE 0.
+           05  TOT-NUM-SALES        PIC S9(3) PACKED-DECIMAL
+                                                 VALUE 0.
+           05  TOT-SHR-AMT          PIC S9(11)V9999 PACKED-DECIMAL
+                                                 VALUE 0.
+           05  TOT-COMM-AMT         PIC S9(11)V99 PACKED-DECIMAL
+                                                 VALUE 0.
+           05  COMM-AMT             PIC S9(8)V99 PACKED-DECIMAL
+                                                 VALUE 0.
+           05  SHR-AMT              PIC S9(10)V999 PACKED-DECIMAL
+                                                 VALUE 0.
+           05  DEP-AMT              PIC S9(8)V99 PACKED-DECIMAL
+                                                 VALUE 0.
+           05  SHR-PRC              PIC S9(3)V99 PACKED-DECIMAL
+                                                 VALUE 0.
+           05  BROKER-CTR           PIC S9(3) PACKED-DECIMAL
+                                                 VALUE 0.
+           05  HS-TOT-SHR-AMT       PIC S9(11)V9999 PACKED-DECIMAL
+                                                 VALUE 0.
+           05  AVGBRKRDEP           PIC S9(10)V99 PACKED-DECIMAL
+                                                 VALUE 0.
+
+       01  SUBPROGRAM               PIC X(8)  VALUE 'BUILDTBL'.
+
+       01  FUND-TBL.
+           05  TBL-FUND-CTR         PIC S9(3) BINARY SYNC VALUE 0.
+           05  TBL-FUND-NTRY        OCCURS 1 TO 199 TIMES
+                                    DEPENDING ON TBL-FUND-CTR
+                                    ASCENDING KEY TBL-FUND-NBR
+                                    INDEXED BY FUND-NDX.
+       COPY FUNDTBL.
+
+       01  EOFFLAG                  PIC X      VALUE 'N'.
+
+       01  RECORD-CTR               PIC S9(3)  BINARY SYNC VALUE 0.
+
+       01  DETAIL-LINE.
+           05  OSALE-BRANCH-NME     PIC X(25).
+           05  OSALE-BROKER-NME     PIC X(25).
+           05  OSALE-FUND-NBR       PIC 9(3).
+           05  FILLER               PIC X(2).
+           05  OSALE-FUND-NME       PIC X(25).
+           05  FILLER               PIC X(1).
+           05  OSALE-DEP-AMT        PIC $$$,$$$,$$9.99.
+           05  FILLER               PIC X(1).
+           05  OSALE-SHR-AMT        PIC Z,ZZZ,ZZZ,ZZ9.9999.
+           05  FILLER               PIC X(1).
+           05  OSALE-COMM-AMT       PIC $$$,$$$,$$9.99.
+
+
+        01  DETAIL-2.
+            05 DETAIL-LINE-2.
+               10  FILLER                   PIC X(16) VALUE SPACES.
+               10  OUT-HS-BROKER-NME        PIC X(25).
+               10  FILLER                   PIC X(8).
+               10  OUT-HS-FUND-NBR          PIC ZZZ.
+               10  FILLER                   PIC X(10) VALUE SPACES.
+               10  OUT-HS-FUND-NME          PIC X(25).
+               10  FILLER                   PIC X(10) VALUE SPACES.
+               10  OUT-HS-SHR-AMT           PIC Z,ZZZ,ZZZ,ZZZ.9990.
+               10  FILLER                   PIC X(29) VALUE SPACES.
+
+        01 TOTAL-DET-LINE.
+           05   FILLER               PIC X(29)  VALUE SPACES.
+           05   OUT-REC-CTR          PIC ZZ9.
+           05   FILLER               PIC X(22)  VALUE SPACES.
+           05   OUT-SALE-CTR         PIC ZZ9.
+           05   FILLER               PIC X(20) VALUE SPACES.
+           05   OUT-TOT-DEP-AMT      PIC $$$,$$$,$$$,$$9.99.
+           05   FILLER               PIC X(23) VALUE SPACES.
+           05   OUT-TOT-COMM-AMT     PIC $$$$,$$9.99.
+
+       01  COL-HDR-2.
+           05  COL-HDR-LINE2.
+               10  FILLER                   PIC X(49) VALUE SPACES.
+               10  FILLER                   PIC X(4)
+                                            VALUE 'FUND'.
+               10  FILLER                   PIC X(35) VALUE SPACES.
+               10  FILLER                   PIC X(7)
+                                            VALUE 'DEPOSIT'.
+               10  FILLER                   PIC X(24) VALUE SPACES.
+               10  FILLER                   PIC X(10)
+                                            VALUE 'COMMISSION'.
+
+       01  COL-HDR-1.
+           05  COL-HDR-LINE.
+               10  FILLER                   PIC X(11)
+                                            VALUE 'BRANCH NAME'.
+               10  FILLER                   PIC X(14) VALUE SPACES.
+               10  FILLER                   PIC X(11)
+                                            VALUE 'BROKER NAME'.
+               10  FILLER                   PIC X(14) VALUE SPACES.
+               10  FILLER                   PIC X(3)
+                                            VALUE 'NBR'.
+               10  FILLER                   PIC X(2) VALUE SPACES.
+               10  FILLER                   PIC X(9)
+                                            VALUE 'FUND NAME'.
+               10  FILLER                   PIC X(25) VALUE SPACES.
+               10  FILLER                   PIC X(6)
+                                            VALUE 'AMOUNT'.
+               10  FILLER                   PIC X(8) VALUE SPACES.
+               10  FILLER                   PIC X(11)
+                                            VALUE 'SHARES SOLD'.
+               10  FILLER                   PIC X(9) VALUE SPACES.
+               10  FILLER                   PIC X(6)
+                                            VALUE 'AMOUNT'.
+
+       01  PAGE-HDR-1.
+           05  OUT-DATE.
+               10  CURRENT-MONTH        PIC  9(2).
+               10  FILLER               PIC  X    VALUE '/'.
+               10  CURRENT-DAY          PIC  9(2).
+               10  FILLER               PIC  X    VALUE '/'.
+               10  CURRENT-YEAR         PIC  9(4).
+           05  FILLER                   PIC X(38) VALUE SPACES.
+           05  OUT-FUND-NME             PIC X(35)
+                            VALUE 'WASHINGTON & LINCOLN INVESTMENTS'.
+           05  FILLER                   PIC X(37) VALUE SPACES.
+           05  FILLER                   PIC X(6)  VALUE 'PAGE: '.
+           05  OUT-PAGE-CTR             PIC ZZ9.
+
+       01  PAGE-HDR-2.
+           05  OUT-TIME.
+               10  CURRENT-HOUR         PIC  9(2).
+               10  FILLER               PIC  X    VALUE ':'.
+               10  CURRENT-MINUTE       PIC  9(2).
+               10  FILLER               PIC  X    VALUE ' '.
+               10  CURRENT-MERID        PIC  X(2).
+           05  FILLER                   PIC X(38) VALUE SPACES.
+           05  OUT-TITLE-HDR            PIC X(45)
+               VALUE '    DAILY BROKER DEPOSIT REPORT              '.
+           05  FILLER                   PIC X(39) VALUE SPACES.
+
+        01  CURRENT-DATE-FIELDS.
+           05  CURRENT-DATE.
+               10  CURRENT-YEAR             PIC  9(4).
+               10  CURRENT-MONTH            PIC  9(2).
+               10  CURRENT-DAY              PIC  9(2).
+           05  CURRENT-TIME.
+               10  CURRENT-HOUR             PIC  9(2).
+               10  CURRENT-MINUTE           PIC  9(2).
+               10  CURRENT-SECOND           PIC  9(2).
+               10  CURRENT-MS               PIC  9(2).
+           05  DIFF-FROM-GMT                PIC S9(4).
+
+       01  HYPHENS-1.
+           05  HYPHENS-LINE.
+               10  FILLER                   PIC X(24)
+                                            VALUE ALL '-'.
+               10  FILLER                   PIC X(1) VALUE SPACES.
+               10  FILLER                   PIC X(23)
+                                            VALUE ALL '-'.
+               10  FILLER                   PIC X(1)  VALUE SPACES.
+               10  FILLER                   PIC X(4)
+                                            VALUE ALL '-'.
+               10  FILLER                   PIC X(2)  VALUE SPACES.
+               10  FILLER                   PIC X(25)
+                                            VALUE ALL '-'.
+               10  FILLER                   PIC X(1)  VALUE SPACES.
+               10  FILLER                   PIC X(14)
+                                            VALUE ALL '-'.
+               10  FILLER                   PIC X(1) VALUE SPACES.
+               10  FILLER                   PIC X(18)
+                                            VALUE ALL '-'.
+               10  FILLER                   PIC X(1) VALUE SPACES.
+               10  FILLER                   PIC X(14)
+                                            VALUE ALL '-'.
+
+        01 TOTAL-DETAIL1.
+           05  DETAIL-LINE1.
+               10  FILLER                   PIC X(51) VALUE SPACES.
+               10  FILLER                   PIC X(25)
+                               VALUE '***** REPORT TOTALS *****'.
+               10  FILLER                   PIC X(56) VALUE SPACES.
+
+        01 TOTAL-HEADER.
+           05  DETAIL-LINE2.
+               10  FILLER                   PIC X(25) VALUE SPACES.
+               10  FILLER                   PIC X(7)
+                                            VALUE 'BROKERS'.
+               10  FILLER                   PIC X(10) VALUE SPACES.
+               10  FILLER                   PIC X(15)
+                               VALUE 'NUMBER OF SALES'.
+               10  FILLER                   PIC X(24) VALUE SPACES.
+               10  FILLER                   PIC X(14)
+                               VALUE 'TOTAL DEPOSITS'.
+               10  FILLER                   PIC X(17) VALUE SPACES.
+               10  FILLER                   PIC X(17)
+                               VALUE 'TOTAL COMMISSIONS'.
+        01 TOTAL-HYPHEN1.
+           05 DETAIL-LINE3.
+              10   FILLER                   PIC X(25) VALUE SPACES.
+              10   FILLER                   PIC X(7)  VALUE ALL '-'.
+              10   FILLER                   PIC X(10) VALUE SPACES.
+              10   FILLER                   PIC X(15) VALUE ALL '-'.
+              10   FILLER                   PIC X(20) VALUE SPACES.
+              10   FILLER                   PIC X(18) VALUE ALL '-'.
+              10   FILLER                   PIC X(16) VALUE SPACES.
+              10   FILLER                   PIC X(18) VALUE ALL '-'.
+
+         01 TOTAL-BRKR-DEP.
+            05 FILLER                       PIC X(50) VALUE SPACES.
+            05 FILLER                       PIC X(26)
+                               VALUE 'AVERAGE DEPOSIT BY BROKER:'.
+            05 FILLER                       PIC X(1) VALUE SPACES.
+            05 OAVGBRKRDEP                  PIC $$$,$$$,$$$,$$9.99.
+            05 FILLER                       PIC X(31) VALUE SPACES.
+
+       01  PAGE-HDR-7.
+           05  FILLER                       PIC X(16) VALUE SPACES.
+           05  FILLER                       PIC X(11)
+                                     VALUE 'BROKER NAME'.
+           05  FILLER                       PIC X(22) VALUE SPACES.
+           05  FILLER                       PIC X(3)
+                                     VALUE 'NBR'.
+           05  FILLER                       PIC X(10) VALUE SPACES.
+           05  FILLER                       PIC X(9)
+                                     VALUE 'FUND NAME'.
+           05  FILLER                       PIC X(33) VALUE SPACES.
+           05  FILLER                       PIC X(11)
+                                     VALUE 'SHARES SOLD'.
+       01  FUND-HS-HDR.
+           05  FILLER                       PIC X(48) VALUE SPACES.
+           05  FILLER                       PIC X(4) VALUE 'FUND'.
+           05  FILLER                       PIC X(80) VALUE SPACES.
+
+       01  HYPHENS-3.
+           05  HYPHENS-LINE.
+               10  FILLER                   PIC X(16) VALUE SPACES.
+               10  FILLER                   PIC X(25)
+                                            VALUE ALL '-'.
+               10  FILLER                   PIC X(7) VALUE SPACES.
+               10  FILLER                   PIC X(4)
+                                            VALUE ALL '-'.
+               10  FILLER                   PIC X(10) VALUE SPACES.
+               10  FILLER                   PIC X(25)
+                                            VALUE ALL '-'.
+               10  FILLER                   PIC X(10) VALUE SPACES.
+               10  FILLER                   PIC X(18)
+                                            VALUE ALL '-'.
+               10  FILLER                   PIC X(15) VALUE SPACES.
+
+       01  PAGE-HDR-HIGH-TOT.
+           05  FILLER                       PIC X(35) VALUE SPACES.
+           05  FILLER                       PIC X(17)
+                               VALUE 'HIGH SALE BROKERS'.
+           05  FILLER                       PIC X(14) VALUE SPACES.
+           05  FILLER                       PIC X(27)
+                               VALUE 'TOTAL HIGH SALE SHARES SOLD'.
+           05  FILLER                       PIC X(39) VALUE SPACES.
+
+       01  HYPHENS-4.
+           05  HYPHENS-LINE.
+               10  FILLER                   PIC X(35) VALUE SPACES.
+               10  FILLER                   PIC X(17)
+                                            VALUE ALL '-'.
+               10  FILLER                   PIC X(14)  VALUE SPACES.
+               10  FILLER                   PIC X(27)
+                                            VALUE ALL '-'.
+               10  FILLER                   PIC X(39) VALUE SPACES.
+
+       01  HS-TOT-AMT-HDR.
+           05  FILLER                       PIC X(50) VALUE SPACES.
+           05  OUT-TOT-HS-BKR               PIC ZZ.
+           05  FILLER                       PIC X(22) VALUE SPACES.
+           05  OUT-HS-TOT-SHR-AMT           PIC ZZ,ZZZ,ZZZ,ZZZ.ZZZ0.
+           05  FILLER                       PIC X(5) VALUE SPACES.
+           05  FILLER                       PIC X(37) VALUE SPACES.
+
+       PROCEDURE DIVISION.
+
+       0000-MAIN.
+
+      ***************************************************
+      * PERFORM TIME AND OPEN FILES AND CALL FUND-TBL   *
+      ***************************************************
+
+           PERFORM 0120-CURRENT-DATE-TIME.
+
+           OPEN INPUT SALE-FILE
+                OUTPUT REPORT-FILE
+                OUTPUT HIGH-SALE-FILE.
+
+           CALL SUBPROGRAM USING FUND-TBL.
+
+      ***************************************************
+      * READ THE SALE FILE & PROCESS THE RECORD TO PRNT *
+      ***************************************************
+
+           READ SALE-FILE
+             AT END MOVE 'Y' TO EOFFLAG
+           END-READ.
+
+           IF EOFFLAG = 'N'
+
+             PERFORM 0100-PROCESS-FIRST-RECORD
+
+             UNTIL EOFFLAG = 'Y'
+
+             PERFORM 0400-TOTALS-CALC
+
+
+           CLOSE SALE-FILE
+                 HIGH-SALE-FILE
+      ***************************************************
+      * MOVE EOFFLAG AND RESET CTR VARIABLES FOR PRNT   *
+      ***************************************************
+           MOVE 'N' TO EOFFLAG
+           MOVE 99 TO LINE-CTR
+           MOVE 0 TO SALE-CTR
+                     TOT-SHR-AMT
+                     PAGE-CTR
+      ***************************************************
+      * HIGH SALES PROCESS OPEN FILE & READ FROM IT     *
+      ***************************************************
+
+           OPEN INPUT HIGH-SALE-FILE
+
+             READ HIGH-SALE-FILE
+               AT END MOVE 'Y' TO EOFFLAG
+             END-READ
+
+             PERFORM 0500-PROCESS-HIGH-SALES
+               UNTIL EOFFLAG = 'Y'
+
+             PERFORM 0600-HIGH-SALES-TOTALS
+
+           END-IF.
+
+           CLOSE REPORT-FILE
+                 HIGH-SALE-FILE.
+
+           MOVE 0 TO RETURN-CODE.
+
+           GOBACK.
+
+       0000-EXIT. EXIT.
+
+       0100-PROCESS-FIRST-RECORD.
+
+      ***************************************************
+      * MOVE OUT BRANCH AND BROKER NAMES                *
+      ***************************************************
+
+            MOVE SALE-BRANCH-NME TO OSALE-BRANCH-NME.
+            MOVE SALE-BROKER-NME TO OSALE-BROKER-NME.
+            ADD 1 TO BROKER-CTR.
+
+      ***************************************************
+      * MOVE THE SALE-NDX VALUES OUT TO DETAIL LINE     *
+      ***************************************************
+
+            PERFORM VARYING SALE-NDX
+              FROM 1 BY 1 UNTIL SALE-NDX > 4
+
+              MOVE SALE-FUND-NBR (SALE-NDX) TO OSALE-FUND-NBR
+              MOVE SALE-DEP-AMT (SALE-NDX) TO OSALE-DEP-AMT
+              MOVE SALE-DEP-AMT (SALE-NDX) TO DEP-AMT
+      ***************************************************
+      * COMPUTE TOTAL DEP AMT AND AVERAGE BROKER DEP    *
+      ***************************************************
+
+              COMPUTE TOT-DEP-AMT ROUNDED =
+                      TOT-DEP-AMT + DEP-AMT
+
+              COMPUTE AVGBRKRDEP ROUNDED =
+                      TOT-DEP-AMT / BROKER-CTR
+
+      ***************************************************
+      * MOVE BLANKS TO LINE IF SALE-NDX > 1             *
+      ***************************************************
+
+              IF SALE-NDX > 1
+
+                MOVE ' ' TO OSALE-BRANCH-NME
+                MOVE ' ' TO OSALE-BROKER-NME
+              END-IF
+      ***************************************************
+      * DO SEARCH FUNCTION FOR SALES                    *
+      ***************************************************
+              IF SALE-FUND-NBR (SALE-NDX) > 0
+                PERFORM 0200-SEARCH-FUNDREC
+                IF LINE-CTR > 16
+                PERFORM 0110-WRITE-SALES-HDRS
+              END-IF
+
+              WRITE REPORT-RECORD FROM DETAIL-LINE AFTER 2
+              ADD 1 TO LINE-CTR
+
+            END-IF
+           END-PERFORM.
+
+            READ SALE-FILE
+              AT END MOVE 'Y' TO EOFFLAG
+            END-READ.
+
+       0100-EXIT. EXIT.
+
+       0110-WRITE-SALES-HDRS.
+
+      ***************************************************
+      * WRITE HEADERS FOR INITAL SALES                  *
+      ***************************************************
+
+           ADD 1 TO PAGE-CTR.
+           MOVE PAGE-CTR TO OUT-PAGE-CTR.
+           WRITE REPORT-RECORD FROM PAGE-HDR-1 AFTER PAGE.
+           WRITE REPORT-RECORD FROM PAGE-HDR-2 AFTER 1.
+
+           WRITE REPORT-RECORD FROM COL-HDR-2 AFTER 2
+           WRITE REPORT-RECORD FROM COL-HDR-1 AFTER 1.
+           WRITE REPORT-RECORD FROM HYPHENS-1 AFTER 1.
+
+           MOVE 0 TO LINE-CTR.
+
+       0110-EXIT. EXIT.
+
+       0200-SEARCH-FUNDREC.
+
+      ***************************************************
+      * SEARCH FUNCTION FOR FUND-NDX                    *
+      ***************************************************
+
+            ADD 1 TO SALE-CTR.
+             SEARCH ALL TBL-FUND-NTRY
+               AT END
+                   MOVE '*** FUND NBR NOT FOUND **' TO OSALE-FUND-NME
+                   MOVE '0' TO OSALE-SHR-AMT
+                   MOVE '0' TO OSALE-COMM-AMT
+               WHEN TBL-FUND-NBR (FUND-NDX) = SALE-FUND-NBR (SALE-NDX)
+                   MOVE TBL-FUND-NME (FUND-NDX) TO OSALE-FUND-NME
+               CALL 'CALCAMT' USING DEP-AMT
+                                    TBL-FUND-SHR-PRC(FUND-NDX)
+                                    SHR-AMT
+                                    TBL-FUND-COMM-PCT(FUND-NDX)
+                                    COMM-AMT
+               MOVE SHR-AMT TO OSALE-SHR-AMT
+               MOVE COMM-AMT TO OSALE-COMM-AMT
+               COMPUTE TOT-COMM-AMT ROUNDED =
+                       TOT-COMM-AMT + COMM-AMT
+               IF SHR-AMT > 10000.0000
+                  MOVE SHR-AMT TO HS-SHR-AMT
+                  MOVE SALE-BROKER-NME TO HS-BROKER-NME
+                  MOVE TBL-FUND-NBR (FUND-NDX) TO HS-FUND-NBR
+                  WRITE HIGH-SALE-RECORD
+               END-IF
+              END-SEARCH.
+
+        0200-EXIT. EXIT.
+
+        0120-CURRENT-DATE-TIME.
+
+      ***************************************************
+      * TIME FUNCTION TO PRINT TO HEADER                *
+      ***************************************************
+
+           MOVE FUNCTION CURRENT-DATE TO CURRENT-DATE-FIELDS.
+
+           IF CURRENT-HOUR OF CURRENT-TIME >= 0 AND
+              CURRENT-HOUR OF CURRENT-TIME < 12
+              MOVE 'AM' TO CURRENT-MERID
+              IF CURRENT-HOUR OF CURRENT-TIME = 0
+                MOVE 12 TO CURRENT-HOUR OF CURRENT-TIME
+              END-IF
+           ELSE
+              MOVE 'PM' TO CURRENT-MERID
+              IF CURRENT-HOUR OF CURRENT-TIME >= 13
+                COMPUTE CURRENT-HOUR OF CURRENT-TIME =
+                  CURRENT-HOUR OF CURRENT-TIME - 12
+              END-IF
+           END-IF.
+
+           MOVE CORR CURRENT-DATE TO OUT-DATE.
+           MOVE CORR CURRENT-TIME TO OUT-TIME.
+
+        0120-EXIT. EXIT.
+
+        0400-TOTALS-CALC.
+
+      ***************************************************
+      *CALCULATE THE TOTALS AND MOVE THEM TO DETAIL     *
+      ***************************************************
+
+           ADD 1 TO PAGE-CTR.
+           MOVE PAGE-CTR TO OUT-PAGE-CTR.
+           MOVE TOT-DEP-AMT TO OUT-TOT-DEP-AMT.
+           MOVE TOT-COMM-AMT TO OUT-TOT-COMM-AMT.
+           MOVE SALE-CTR TO OUT-SALE-CTR.
+           MOVE BROKER-CTR TO OUT-REC-CTR.
+           MOVE AVGBRKRDEP TO OAVGBRKRDEP.
+           WRITE REPORT-RECORD FROM PAGE-HDR-1 AFTER 2.
+           WRITE REPORT-RECORD FROM PAGE-HDR-2 AFTER 1.
+           WRITE REPORT-RECORD FROM TOTAL-DETAIL1 AFTER 2.
+           WRITE REPORT-RECORD FROM TOTAL-HEADER AFTER 2.
+           WRITE REPORT-RECORD FROM TOTAL-HYPHEN1 AFTER 1.
+           WRITE REPORT-RECORD FROM TOTAL-DET-LINE AFTER 1.
+           WRITE REPORT-RECORD FROM TOTAL-BRKR-DEP AFTER 2.
+        0400-EXIT. EXIT.
+
+        0500-PROCESS-HIGH-SALES.
+            ADD 1 TO HS-SALE-CTR.
+
+      ***************************************************
+      * SEARCH TABLE FOR HIGH SALES                     *
+      ***************************************************
+
+             SEARCH ALL TBL-FUND-NTRY
+               WHEN TBL-FUND-NBR (FUND-NDX) = HS-FUND-NBR
+                   MOVE TBL-FUND-NME (FUND-NDX) TO OUT-HS-FUND-NME
+            END-SEARCH.
+
+      ***************************************************
+      * MOVE HIGH SALES RECORDS TO OUTPUT               *
+      ***************************************************
+
+           MOVE HS-BROKER-NME TO OUT-HS-BROKER-NME.
+           MOVE HS-SHR-AMT TO OUT-HS-SHR-AMT
+           MOVE HS-FUND-NBR TO OUT-HS-FUND-NBR
+
+      ***************************************************
+      * CALCULATE TOTAL FOR HIGH SALES                  *
+      ***************************************************
+
+           COMPUTE HS-TOT-SHR-AMT ROUNDED =
+                   HS-TOT-SHR-AMT + HS-SHR-AMT.
+
+      ***************************************************
+      * PRINT HEADER EVERY 17 LINES                     *
+      ***************************************************
+
+           IF LINE-CTR > 17
+              PERFORM 0510-HIGH-HEADER
+           ELSE
+              WRITE REPORT-RECORD FROM DETAIL-LINE-2 AFTER 1
+              ADD 1 TO LINE-CTR
+           END-IF.
+
+           READ HIGH-SALE-FILE
+               AT END MOVE 'Y' TO EOFFLAG
+           END-READ.
+
+
+        0500-EXIT. EXIT.
+
+        0510-HIGH-HEADER.
+
+      ***************************************************
+      * THIS PRINTS THE HIGH SALES HEADER               *
+      ***************************************************
+
+           ADD 1 TO PAGE-CTR.
+           MOVE PAGE-CTR TO OUT-PAGE-CTR.
+           WRITE REPORT-RECORD FROM PAGE-HDR-1 AFTER PAGE.
+           MOVE '      BROKER HIGH SALES REPORT   '
+           TO OUT-TITLE-HDR.
+           WRITE REPORT-RECORD FROM PAGE-HDR-2 AFTER 1.
+
+           WRITE REPORT-RECORD FROM FUND-HS-HDR AFTER 2.
+           WRITE REPORT-RECORD FROM PAGE-HDR-7 AFTER 1.
+           WRITE REPORT-RECORD FROM HYPHENS-3 AFTER 1.
+
+           MOVE 0 TO LINE-CTR.
+
+        0510-EXIT. EXIT.
+
+        0600-HIGH-SALES-TOTALS.
+
+      ***************************************************
+      * MOVE HS VALUES OUT AND PRINT DETAIL LINE        *
+      ***************************************************
+
+           MOVE HS-SALE-CTR TO OUT-TOT-HS-BKR.
+           MOVE HS-TOT-SHR-AMT TO OUT-HS-TOT-SHR-AMT.
+           ADD 1 TO PAGE-CTR.
+           MOVE PAGE-CTR TO OUT-PAGE-CTR.
+
+           WRITE REPORT-RECORD FROM PAGE-HDR-1 AFTER PAGE.
+           MOVE '      BROKER HIGH SALES REPORT '
+           TO OUT-TITLE-HDR.
+           WRITE REPORT-RECORD FROM PAGE-HDR-2 AFTER 1.
+
+           WRITE REPORT-RECORD FROM TOTAL-DETAIL1 AFTER 2.
+           WRITE REPORT-RECORD FROM PAGE-HDR-HIGH-TOT AFTER 1.
+           WRITE REPORT-RECORD FROM HYPHENS-4 AFTER 1.
+           WRITE REPORT-RECORD FROM HS-TOT-AMT-HDR AFTER 1.
+           MOVE 0 TO LINE-CTR.
+
+        0600-EXIT. EXIT.
+
+
+/*
+//*
+//SYSLIN   DD DSN=&&OBJMOD1,SPACE=(CYL,(1,1)),DISP=(MOD,PASS)
+//*
+//SYSPRINT DD SYSOUT=*
+//*
+//SYSUT1   DD SPACE=(CYL,(1,1))
+//SYSUT2   DD SPACE=(CYL,(1,1))
+//SYSUT3   DD SPACE=(CYL,(1,1))
+//SYSUT4   DD SPACE=(CYL,(1,1))
+//SYSUT5   DD SPACE=(CYL,(1,1))
+//SYSUT6   DD SPACE=(CYL,(1,1))
+//SYSUT7   DD SPACE=(CYL,(1,1))
+//SYSUT8   DD SPACE=(CYL,(1,1))
+//SYSUT9   DD SPACE=(CYL,(1,1))
+//SYSUT10  DD SPACE=(CYL,(1,1))
+//SYSUT11  DD SPACE=(CYL,(1,1))
+//SYSUT12  DD SPACE=(CYL,(1,1))
+//SYSUT13  DD SPACE=(CYL,(1,1))
+//SYSUT14  DD SPACE=(CYL,(1,1))
+//SYSUT15  DD SPACE=(CYL,(1,1))
+//SYSMDECK DD SPACE=(CYL,(1,1))
+//*
+//*
+//*
+//*
+//JSTEP03  EXEC PGM=ASMA90,PARM=ASA,COND=(0,LT)
+//*
+//SYSLIB   DD DSN=SYS1.MACLIB,DISP=SHR
+//*
+//SYSIN    DD *
+CALCAMT  CSECT
+         STM   14,12,12(13)         STANDARD ENTRY LINKAGE
+         LR    12,15
+         USING CALCAMT,12
+         LA    14,CALCREGS
+         ST    13,4(,14)
+         ST    14,8(,13)
+         LR    13,14
+****************************************************************
+* LOAD MUULTIPLE VALUES INTO REGISTERS                         *
+****************************************************************
+         LM    5,9,0(1)             R5 -> DEP AMT
+*                                   R6 -> SHARE PRICE
+*                                   R7 -> SHARE AMOUNT CALCULATED
+*                                   R8 -> COMM PERCENT
+*                                   R9 -> COMM AMOUNT
+****************************************************************
+* MOVE IN THE VARIABLES TO THEIR REPSECTIVE REGISTERS          *
+****************************************************************
+         ZAP   DEPAMT(11),0(6,5)    LOAD DEPAMT INTO REG 5
+         ZAP   SHRPRC(3),0(3,6)     LOAD SHRPRICE INTO REG 6
+         ZAP   COMMPCT(4),0(4,8)    LOAD COMM PCT INTO REG 8
+****************************************************************
+* CALCULATION FOR THE SHARES SOLD                              *
+****************************************************************
+         ZAP   CALCLATE(11),DEPAMT(11)  ADD DEPAMT TO CALC
+         SRP   CALCLATE(11),4,0         SHIFT SHARES LEFT 4
+         DP    CALCLATE(11),SHRPRC(3)   DIVIDE AND CALC SHARES SOLD
+         SRP   CALCLATE(8),64-1,5       SHIFT SHARES RIGHT 1 & ROUND
+         ZAP   0(7,7),CALCLATE+1(7)     SET RESULTS TO REG 7
+*
+         ZAP   COMMAMT(11),DEPAMT(11)  INT COMMISSION AMT
+         MP    COMMAMT(11),COMMPCT(4)  CALC COMM AMT
+         SRP   COMMAMT(11),64-7,5      SHIFT LEFT 2 AND ROUND
+         ZAP   0(6,9),COMMAMT(11)     SET R9 TO CALC OF COMM
+*
+         SR    15,15                  STANDARD EXIT LINKAGE
+         L     13,4(,13)
+         L     14,12(,13)
+         LM    0,12,20(13)
+         BR    14
+*
+         LTORG
+*
+CALCREGS DS    18F
+*
+CALCLATE DC    PL11'0'
+DEPAMT   DC    PL11'0'               PACKED DEPOSIT AMT
+SHRPRC   DC    PL3'0'
+COMMPCT  DS    PL4
+COMMAMT  DC    PL11'0'
+*
+         END   CALCAMT
+/*
+//*
+//SYSLIN   DD DSN=&&OBJMOD2,SPACE=(CYL,(1,1)),DISP=(MOD,PASS)
+//*
+//SYSPRINT DD SYSOUT=*
+//*
+//SYSUT1   DD SPACE=(CYL,(1,1))
+//*
+//JSTEP04  EXEC PGM=HEWL,COND=(0,LT)
+//*
+//SYSLIB   DD DSN=CEE.SCEELKED,DISP=SHR
+//*
+//SYSLIN   DD DSN=&&OBJMOD1,DISP=(OLD,DELETE,DELETE)
+//         DD DSN=&&OBJMOD2,DISP=(OLD,DELETE,DELETE)
+//*
+//SYSLMOD  DD DSN=KC03BDC.CSCI465.LOADLIB(SALERPT),
+//            SPACE=(1024,(50,20,1)),DSNTYPE=LIBRARY,
+//            DISP=(MOD,KEEP,KEEP)
+//*
+//SYSPRINT DD SYSOUT=*
+//*
+//JSTEP05  EXEC PGM=IGYCRCTL,PARM=APOST,REGION=0M,COND=(0,LT)
+//*
+//STEPLIB  DD DSN=IGY630.SIGYCOMP,DISP=SHR
+//*
+//SYSLIB   DD DSN=KC02322.CSCI465.COPYLIB,DISP=SHR
+//*
+//SYSIN    DD *
+      ****************************************************************
+      *                                                              *
+      *                   BUILDTBL                                   *
+      *                                                              *
+      *                                                              *
+      ****************************************************************
+
+       IDENTIFICATION DIVISION.
+
+       PROGRAM-ID.    BUILDTBL.
+       AUTHOR.        GEOFFREY D DECKER.
+       DATE-WRITTEN.  11/29/2021.
+       DATE-COMPILED.
+
+       ENVIRONMENT DIVISION.
+
+       INPUT-OUTPUT SECTION.
+
+       FILE-CONTROL.
+
+           SELECT FUND-FILE ASSIGN TO FUNDFILE.
+
+       DATA DIVISION.
+
+       FILE SECTION.
+
+       FD  FUND-FILE
+           RECORDING MODE F.
+
+       COPY FUNDREC.
+           05  FILLER               PIC X(41).
+
+       WORKING-STORAGE SECTION.
+
+       01  EOFFLAG                  PIC X      VALUE 'N'.
+
+
+       LINKAGE SECTION.
+
+       01  FUND-TBL.
+           05  TBL-FUND-CTR         PIC S9(3) BINARY SYNC.
+           05  TBL-FUND-NTRY        OCCURS 1 TO 999 TIMES
+                                    DEPENDING ON TBL-FUND-CTR
+                                    ASCENDING KEY TBL-FUND-NBR
+                                    INDEXED BY FUND-NDX.
+       COPY FUNDTBL.
+
+       PROCEDURE DIVISION USING FUND-TBL.
+
+       0000-MAIN.
+
+           OPEN INPUT FUND-FILE.
+
+           READ FUND-FILE
+             AT END MOVE 'Y' TO EOFFLAG
+           END-READ.
+
+           PERFORM 0100-BUILD-FUND-TBL VARYING FUND-NDX
+              FROM 1 BY 1 UNTIL EOFFLAG = 'Y'
+                             OR FUND-NDX > 199.
+
+           CLOSE FUND-FILE.
+
+           MOVE 0 TO RETURN-CODE.
+
+           GOBACK.
+
+       0000-EXIT. EXIT.
+
+       0100-BUILD-FUND-TBL.
+
+           ADD 1 TO TBL-FUND-CTR.
+
+           MOVE IN-FUND-NBR TO TBL-FUND-NBR (FUND-NDX).
+           MOVE IN-FUND-NME TO TBL-FUND-NME (FUND-NDX).
+           MOVE IN-FUND-SHR-PRC TO TBL-FUND-SHR-PRC (FUND-NDX).
+           MOVE IN-FUND-COMM-PCT TO TBL-FUND-COMM-PCT (FUND-NDX).
+
+           READ FUND-FILE
+             AT END MOVE 'Y' TO EOFFLAG
+           END-READ.
+
+       0100-EXIT. EXIT.
+/*
+//*
+//SYSLIN   DD DSN=&&OBJMOD3,SPACE=(CYL,(1,1)),DISP=(MOD,PASS)
+//*
+//SYSPRINT DD SYSOUT=*
+//*
+//SYSUT1   DD SPACE=(CYL,(1,1))
+//SYSUT2   DD SPACE=(CYL,(1,1))
+//SYSUT3   DD SPACE=(CYL,(1,1))
+//SYSUT4   DD SPACE=(CYL,(1,1))
+//SYSUT5   DD SPACE=(CYL,(1,1))
+//SYSUT6   DD SPACE=(CYL,(1,1))
+//SYSUT7   DD SPACE=(CYL,(1,1))
+//SYSUT8   DD SPACE=(CYL,(1,1))
+//SYSUT9   DD SPACE=(CYL,(1,1))
+//SYSUT10  DD SPACE=(CYL,(1,1))
+//SYSUT11  DD SPACE=(CYL,(1,1))
+//SYSUT12  DD SPACE=(CYL,(1,1))
+//SYSUT13  DD SPACE=(CYL,(1,1))
+//SYSUT14  DD SPACE=(CYL,(1,1))
+//SYSUT15  DD SPACE=(CYL,(1,1))
+//SYSMDECK DD SPACE=(CYL,(1,1))
+//*
+//JSTEP06  EXEC PGM=HEWL,COND=(0,LT)
+//*
+//SYSLIB   DD DSN=CEE.SCEELKED,DISP=SHR
+//*
+//SYSLIN   DD DSN=&&OBJMOD3,DISP=(OLD,DELETE,DELETE)
+//*
+//SYSLMOD  DD DSN=KC03BDC.CSCI465.LOADLIB(BUILDTBL),
+//            SPACE=(1024,(50,20,1)),DSNTYPE=LIBRARY,
+//            DISP=(MOD,KEEP,KEEP)
+//*
+//SYSPRINT DD SYSOUT=*
+//*
+//*
+//JSTEP07  EXEC PGM=SALERPT,COND=(0,LT)
+//*
+//STEPLIB  DD DSN=KC03BDC.CSCI465.LOADLIB,DISP=SHR
+//*
+//FUNDFILE DD DSN=&&SORTED,DISP=SHR
+//*
+//SALEFILE DD DSN=KC02322.CSCI465.DATA7(SALES),DISP=SHR
+//*
+//HSFILE   DD SPACE=(TRK,(1,1))
+//*
+//RPTFILE  DD SYSOUT=*
+//*
+//SYSUDUMP DD SYSOUT=*
+//

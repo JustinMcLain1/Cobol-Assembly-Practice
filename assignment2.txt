@@ -1,0 +1,53 @@
+//KC03BDCA JOB ,'J MCLAIN',MSGCLASS=H
+//*
+//*****************************************************************
+//*                                                               *
+//*  CSCI 465               ASSIGNMENT 2               FALL 2021  *
+//*                                                               *
+//*  DEVELOPER NAME: JUSTIN MCLAIN                                *
+//*  DATE DUE: 09/03/2021                                         *
+//*                                                               *
+//*  PURPOSE: The Purpose is to fetch documents one under         *
+//*           Mr.Deckers READRECS stored in the PDSE and the      *
+//*           Second step will fetch and execute a program object *
+//*           named WRTERECS from the same load library           *
+//*  Notes:   None.                                               *
+//*****************************************************************
+//*
+//JSTEP01 EXEC PGM=READRECS //*LOAD MODULE
+//*
+//*
+//STEPLIB  DD DSN=KC02322.CSCI465.LOADLIB,DISP=SHR
+//*
+//*   This step will read an 80-byte record from a member in
+//*   Data2  and will write them out to a second data set
+//*   which will be passed to the second step of the jcl
+//*
+//*
+//RECSIN   DD DSN=KC02322.CSCI465.DATAFA21(DATA2),
+//            DISP=(SHR) //* shares data in data2
+//SYSDUMP  DD SYSOUT=* //* error check
+//*
+//RECSOUT  DD DSN=&&DATA1,
+//            DCB=(RECFM=FB,LRECL=80,BLKSIZE=800), //* for rec lng
+//            SPACE=(TRK,(1,1)), //* specifices storage
+//            DISP=(NEW,PASS)    //* brandnew data and being passed
+//SYSUDUMP DD SYSOUT=* //* error check
+//*
+//*
+//JSTEP02 EXEC PGM=WRTERECS,COND=(0,LT) //* LOAD MODULE
+//*
+//SYSUDUMP DD  SYSOUT=* //* error check
+//*
+//*  The second step's program, , will read 80-byte records from the
+//*  temporary data set your first step passed to it. It will then
+//*  write the records out as "report records" to standard output
+//*  as 133-byte records.
+//*
+//STEPLIB  DD DSN=KC02322.CSCI465.LOADLIB,DISP=SHR
+//RECSIN   DD DSN=&&DATA1,  //* recieves data
+//            DISP=MOD  //* modifies data in DATA1
+//*
+//RECSOUT  DD SYSOUT=* //* gives output
+//*
+//SYSUDUMP DD SYSOUT=* //* error check
